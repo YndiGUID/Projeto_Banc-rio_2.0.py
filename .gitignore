@@ -1,162 +1,184 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+import datetime
+import sys
 
-# C extensions
-*.so
+# Dados dos usuários e suas contas
+usuarios = []
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Limites
+LIMITE_SAQUES_DIARIOS = 3
+LIMITE_VALOR_SAQUE = 500
+LIMITE_TRANSACOES_DIARIAS = 10
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+# Função para criar um novo usuário
+def criar_usuario():
+    nome = input("Informe o nome do usuário: ")
+    cpf = input("Informe o CPF do usuário: ")
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+    # Verificar se o CPF já existe
+    for usuario in usuarios:
+        if usuario['cpf'] == cpf:
+            print("Usuário com esse CPF já existe.")
+            return
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
+    # Adicionar novo usuário
+    novo_usuario = {
+        'nome': nome,
+        'cpf': cpf,
+        'contas': []  # Lista de contas associadas ao usuário
+    }
+    usuarios.append(novo_usuario)
+    print(f"Usuário {nome} criado com sucesso!")
 
-# Translations
-*.mo
-*.pot
+# Função para criar uma conta vinculada a um usuário
+def criar_conta():
+    cpf = input("Informe o CPF do usuário: ")
+    usuario = selecionar_usuario(cpf)
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+    if usuario is None:
+        print("Usuário não encontrado.")
+        return
 
-# Flask stuff:
-instance/
-.webassets-cache
+    # Verificar se o usuário já tem uma conta
+    if usuario['contas']:
+        print(f"Usuário {usuario['nome']} já possui uma conta.")
+        return
 
-# Scrapy stuff:
-.scrapy
+    # Criar nova conta
+    nova_conta = {
+        'saldo': 0,
+        'movimentacoes': [],
+        'saques_diarios': 0,
+        'data_ultimo_saque': datetime.date.today(),
+        'transacoes_diarias': 0,
+        'data_ultima_transacao': datetime.date.today(),
+    }
+    usuario['contas'].append(nova_conta)
+    print(f"Conta criada com sucesso para {usuario['nome']}!")
 
-# Sphinx documentation
-docs/_build/
+# Função para selecionar um usuário com base no CPF
+def selecionar_usuario(cpf):
+    for usuario in usuarios:
+        if usuario['cpf'] == cpf:
+            return usuario
+    return None
 
-# PyBuilder
-.pybuilder/
-target/
+# Função para verificar e reiniciar o limite de transações diárias
+def verificar_limite_transacoes(conta):
+    today = datetime.date.today()
+    if today != conta['data_ultima_transacao']:
+        conta['transacoes_diarias'] = 0
+        conta['data_ultima_transacao'] = today
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Função para realizar saques
+def realizar_saque(conta):
+    verificar_limite_transacoes(conta)  # Reiniciar o limite de transações diárias se for um novo dia
+    
+    if conta['transacoes_diarias'] >= LIMITE_TRANSACOES_DIARIAS:
+        print("Operação falhou! Limite de transações diárias excedido.")
+        return
 
-# IPython
-profile_default/
-ipython_config.py
+    valor_saque = float(input("Informe o valor do saque: R$ "))
+    today = datetime.date.today()
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
+    # Atualizar o número de saques diários
+    if today != conta['data_ultimo_saque']:
+        conta['saques_diarios'] = 0
+        conta['data_ultimo_saque'] = today
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
+    if conta['saques_diarios'] >= LIMITE_SAQUES_DIARIOS:
+        print("Operação falhou! Limite de saques diários excedido.")
+        return
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
+    if valor_saque > LIMITE_VALOR_SAQUE:
+        print(f"O limite por saque é de R$ {LIMITE_VALOR_SAQUE:.2f}. Tente novamente.")
+    elif valor_saque > conta['saldo']:
+        print(f"Operação falhou! Saldo insuficiente. Seu saldo atual é de R$ {conta['saldo']:.2f}.")
+    else:
+        conta['saldo'] -= valor_saque
+        conta['saques_diarios'] += 1
+        conta['transacoes_diarias'] += 1  # Incrementa transações diárias
+        now = datetime.datetime.now()
+        conta['movimentacoes'].append(f"Saque de R$ {valor_saque:.2f} realizado em {now.strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"Saque de R$ {valor_saque:.2f} realizado com sucesso! Seu saldo atual é de R$ {conta['saldo']:.2f}.")
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
+# Função para realizar depósitos
+def realizar_deposito(conta):
+    verificar_limite_transacoes(conta)  # Reiniciar o limite de transações diárias se for um novo dia
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+    if conta['transacoes_diarias'] >= LIMITE_TRANSACOES_DIARIAS:
+        print("Operação falhou! Limite de transações diárias excedido.")
+        return
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+    valor_deposito = float(input("Informe o valor do depósito: R$ "))
+    if valor_deposito > 0:
+        conta['saldo'] += valor_deposito
+        conta['transacoes_diarias'] += 1  # Incrementa transações diárias
+        now = datetime.datetime.now()
+        conta['movimentacoes'].append(f"Depósito de R$ {valor_deposito:.2f} realizado em {now.strftime('%d/%m/%Y %H:%M:%S')}")
+        print(f"Depósito de R$ {valor_deposito:.2f} realizado com sucesso! Seu saldo atual é de R$ {conta['saldo']:.2f}.")
+    else:
+        print("Operação falhou! O valor informado é inválido.")
 
-# SageMath parsed files
-*.sage.py
+# Função para exibir o extrato completo
+def mostrar_extrato(conta):
+    if conta['movimentacoes']:
+        print("Extrato da conta:")
+        for transacao in conta['movimentacoes']:
+            print(transacao)
+    else:
+        print("Nenhuma movimentação realizada.")
 
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
+# Função para exibir o saldo atual
+def mostrar_saldo(conta):
+    print(f"Seu saldo atual é: R$ {conta['saldo']:.2f}")
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Função principal do menu
+def menu_inicial():
+    print("Bem-vindo ao Banco Python!")
+    
+    while True:
+        opcao = input("\nSelecione a operação desejada:\n[1] - Criar Usuário\n[2] - Criar Conta\n[3] - Depósito\n[4] - Saque\n[5] - Extrato\n[6] - Sair\n")
+        
+        if opcao == "1":
+            criar_usuario()
 
-# Rope project settings
-.ropeproject
+        elif opcao == "2":
+            criar_conta()
 
-# mkdocs documentation
-/site
+        elif opcao == "3":
+            cpf = input("Informe o CPF do usuário: ")
+            usuario = selecionar_usuario(cpf)
+            if usuario and usuario['contas']:
+                conta = usuario['contas'][0]
+                realizar_deposito(conta)
+            else:
+                print("Usuário não encontrado ou sem conta.")
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+        elif opcao == "4":
+            cpf = input("Informe o CPF do usuário: ")
+            usuario = selecionar_usuario(cpf)
+            if usuario and usuario['contas']:
+                conta = usuario['contas'][0]
+                realizar_saque(conta)
+            else:
+                print("Usuário não encontrado ou sem conta.")
+        
+        elif opcao == "5":
+            cpf = input("Informe o CPF do usuário: ")
+            usuario = selecionar_usuario(cpf)
+            if usuario and usuario['contas']:
+                conta = usuario['contas'][0]
+                mostrar_extrato(conta)
+                mostrar_saldo(conta)
+            else:
+                print("Usuário não encontrado ou sem conta.")
+        
+        elif opcao == "6":
+            print("Obrigado por utilizar o Banco Python!")
+            sys.exit()
+        
+        else:
+            print("Opção inválida. Tente novamente.")
 
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# Iniciar o menu
+menu_inicial()
